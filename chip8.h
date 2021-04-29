@@ -1,3 +1,7 @@
+#include <cinttypes>
+#include <cstdbool>
+
+
 // 35 opcodes
 // all 2 bytes long
 // 15 8-bit registers V0 to VE
@@ -14,6 +18,8 @@
 class chip8{
 
   public:
+    chip8();
+    ~chip8();
     void initialize();
     void emulateCycle();
 
@@ -30,6 +36,8 @@ class chip8{
     
     uint16_t stack[STACK_SIZE];
     uint16_t SP;
+
+    bool drawFlag = false;
     
     uint8_t keypad[16];
     void fetch();
