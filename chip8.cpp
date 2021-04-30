@@ -2,6 +2,33 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+uint8_t chip8_fontset[80] =
+{
+  0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+  0x20, 0x60, 0x20, 0x20, 0x70, // 1
+  0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+  0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+  0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+  0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+  0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+  0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+  0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+  0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+  0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+  0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+  0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+  0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+  0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+  0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
+
+chip8::chip8() {
+    
+}
+
+chip8::~chip8() {
+    
+}
 void chip8::initialize() {
   PC = 0x200;
   OP = 0;
@@ -13,7 +40,7 @@ void chip8::initialize() {
   for(int i=0; i<80; i++) {
     memory[i] = chip8_fontset[i];
   }
-
+    drawFlag = true;
   //reset timers
 }
 
@@ -25,6 +52,8 @@ void chip8::fetch() {
 
 void chip8::decode_execute() {
 
+  uint32_t a = V[(OP & 0x0F00)>>8];
+  uint32_t b = V[(OP & 0x00F0)>>4];
   switch(OP & 0xF000) { // leftmost 4 bits used for OP interpretation
     case 0x0000:
       switch(OP) {
@@ -63,13 +92,13 @@ void chip8::decode_execute() {
 
     case 0x3000:
       //eq
-      if(V[(OP & 0x0F00) >> 8] == OP & 0x00FF)
+      if(V[(OP & 0x0F00) >> 8] == (OP & 0x00FF))
         PC += 2;
       break;
 
     case 0x4000:
       //neq
-      if(V[(OP & 0x0F00) >> 8] != OP & 0x00FF)
+      if(V[(OP & 0x0F00) >> 8] != (OP & 0x00FF))
         PC += 2;
       break;
 
@@ -107,8 +136,6 @@ void chip8::decode_execute() {
 
         case 0x0004:
           V[(OP & 0x0F00)>>8] += V[(OP & 0x00F0)>>4];
-          uint32_t a = V[(OP & 0x0F00)>>8];
-          uint32_t b = V[(OP & 0x00F0)>>4];
           a += b;
           if(a > 0x0000FFFF){
             a -= 0x00010000; //not necessary?
@@ -121,39 +148,39 @@ void chip8::decode_execute() {
           break;
 
         case 0x0005:
-          uint32_t subtrahend = V[(OP & 0x0F00)>>8];
-          uint32_t minuend = V[(OP & 0x00F0)>>4];
-          if(subtrahend < minuend){
-            subtrahend += 0x00010000; //not necessary?
+//          uint32_t subtrahend = V[(OP & 0x0F00)>>8];
+//          uint32_t minuend = V[(OP & 0x00F0)>>4];
+          if(a < b){
+            a += 0x00010000; //not necessary?
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-          V[(OP & 0x0F00)>>8] = (uint8_t)(subtrahend - minuend);
+          V[(OP & 0x0F00)>>8] = (uint8_t)(a - b);
           break;
 
         case 0x0006:
-          uint16_t temp = V[(OP & 0x0F00)>>8];
-          V[15] = temp & 0x0001;
+//          uint16_t temp = V[(OP & 0x0F00)>>8];
+          V[15] = a & 0x0001;
           V[(OP & 0x0F00)>>8] >>= 1;
           break;
 
         case 0x0007:
-          uint32_t minuend = V[(OP & 0x0F00)>>8];
-          uint32_t subtrahend = V[(OP & 0x00F0)>>4];
-          if(subtrahend < minuend){
-            subtrahend += 0x00010000; //not necessary?
+//          uint32_t minuend = V[(OP & 0x0F00)>>8];
+//          uint32_t subtrahend = V[(OP & 0x00F0)>>4];
+          if(b < a){
+            b += 0x00010000; //not necessary?
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-          V[(OP & 0x0F00)>>8] = subtrahend - minuend;
+          V[(OP & 0x0F00)>>8] = b - a;
           break;
         case 0x000E:
-          uint16_t temp = V[(OP & 0x0F00)>>8];
-          V[15] = temp & 0x8000;
+//          uint16_t temp = V[(OP & 0x0F00)>>8];
+          V[15] = a & 0x8000;
           V[(OP & 0x0F00)>>8] <<= 1;
           break;
         default:
@@ -173,10 +200,10 @@ void chip8::decode_execute() {
       PC -= 2; 
       break;
     case 0xC000:
-      V[(OP & 0x0F00) >> 8] = (rand() % 0x00FF) & (OP & 0x00FF)
+          V[(OP & 0x0F00) >> 8] = (rand() % 0x00FF) & (OP & 0x00FF);
       break;
     case 0xD000:
-
+      {
     //Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N+1 pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value does not change after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn, and to 0 if that does not happen
             //starting from memory[I]
     	uint16_t x = V[(OP & 0x0F00) >> 8];
@@ -192,14 +219,15 @@ void chip8::decode_execute() {
     	  {
     	    if((pixel & (0x80 >> xline)) != 0)
     	    {
-                  if(gfx[(x + xline + ((y + yline) * 64))] == 1)
+                  if(screen[(x + xline + ((y + yline) * 64))] == 1)
     	        V[15] = 1;     // collision                            
-                  gfx[x + xline + ((y + yline) * 64)] ^= 1;
+                  screen[x + xline + ((y + yline) * 64)] ^= 1;
     	    }
     	  }
             }
     	 
     	drawFlag = true;
+      }
     	break;
     case 0xE000:
       switch(OP & 0x00FF){
@@ -255,10 +283,8 @@ void chip8::decode_execute() {
         default:
           printf("Unknown F operation with 0x%X!\n", OP);
           break;
-        } 
-
-      }
-      break;
+        }
+//      break;
     default:
       printf("unknown OP read: 0x%X !\n ", OP);
       break;
@@ -268,7 +294,7 @@ void chip8::decode_execute() {
 
 void chip8::update_timers() {
   delay_timer = (delay_timer > 0) ? delay_timer-1 : 0;
-  if(sount_timer == 1) {
+  if(sound_timer == 1) {
     printf("BEEP!\n");
     //put a sound here!
   }
