@@ -21,7 +21,12 @@ class chip8{
     chip8();
     ~chip8();
     void initialize();
+    void loadProgram(uint8_t * buffer, int size);
     void emulateCycle();
+    void handleKeyPress(int key);
+    bool readyToDraw() { return drawFlag; }
+    void resetDrawFlag() { drawFlag = false; }
+    uint8_t * getScreen() { return screen; }
 
   private:
     uint16_t OP;
@@ -36,7 +41,7 @@ class chip8{
     
     uint16_t stack[STACK_SIZE];
     uint16_t SP;
-
+    
     bool drawFlag;
     
     uint8_t keypad[16];

@@ -1,6 +1,7 @@
 #include "chip8.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <unordered_map>
 
 uint8_t chip8_fontset[80] =
 {
@@ -21,6 +22,60 @@ uint8_t chip8_fontset[80] =
   0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
   0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
+/*
+ Scancode: 0x1E, Name: 1
+ Scancode: 0x1F, Name: 2
+ Scancode: 0x20, Name: 3
+ Scancode: 0x21, Name: 4
+ Scancode: 0x14, Name: Q
+ Scancode: 0x1A, Name: W
+ Scancode: 0x08, Name: E
+ Scancode: 0x15, Name: R
+ Scancode: 0x04, Name: A
+ Scancode: 0x16, Name: S
+ Scancode: 0x07, Name: D
+ Scancode: 0x09, Name: F
+ Scancode: 0x1D, Name: Z
+ Scancode: 0x1B, Name: X
+ Scancode: 0x06, Name: C
+ Scancode: 0x19, Name: V
+ 
+ */
+std::unordered_map<int, int> keyMap = {
+    {0x1E, 0}, //1
+    {0x1F, 1}, //2
+    {0x20, 2}, //3
+    {0x21, 3}, //4
+    {0x14, 4}, //q
+    {0x1A, 5}, //w
+    {0x08, 6}, //e
+    {0x15, 7}, //r
+    {0x04, 8}, //a
+    {0x16, 9}, //s
+    {0x07,10}, //d
+    {0x09,11}, //f
+    {0x1D,12}, //z
+    {0x1B,13}, //x
+    {0x06,14}, //c
+    {0x19,15}  //v
+};
+
+void chip8::handleKeyPress(int key) {
+    if(keyMap.count(key) > 0){
+        keypad[keyMap[key]] = 1;
+        printf("key: 0x%X\n", key);
+
+    }
+    else {
+        printf("undefined key operation!\n");
+    }
+}
+
+void chip8::loadProgram(uint8_t * buffer, int size) {
+    for(int i=0; i<size; i++) {
+        memory[0x200+i] = buffer[i];
+    }
+}
 
 chip8::chip8() {
     
@@ -30,24 +85,34 @@ chip8::~chip8() {
     
 }
 void chip8::initialize() {
-  PC = 0x200;
-  OP = 0;
-  I  = 0;
-  SP = 0;
+    PC = 0x200;
+    OP = 0;
+    I  = 0;
+    SP = 0;
 
-  //will clear display, stack, registers, memory
-
-  for(int i=0; i<80; i++) {
-    memory[i] = chip8_fontset[i];
-  }
+    //will clear display, stack, registers, memory
+    for(int i=0; i<64*32;i++) {
+        screen[i] = 0;
+    }
+//    for(int j=0; j<32; j++){
+//        for(int i=0; i<64; i++){
+//            if(i<(j*2)) screen[i+j*64] = 1;
+//        }
+//    }
+            
+    for(int i=0; i<80; i++) {
+        memory[i] = chip8_fontset[i];
+    }
     drawFlag = true;
-  //reset timers
+    printf("chip 8 emulator initialized\n");
+    //reset timers
 }
 
 
 void chip8::fetch() {
   
-  OP = (memory[PC] << 8) | memory[PC+1];
+    OP = (memory[PC] << 8) | memory[PC+1];
+    printf("OP : 0x%X\n", OP);
 }
 
 void chip8::decode_execute() {
@@ -71,7 +136,9 @@ void chip8::decode_execute() {
           //return
           break;
         default:
-          //call OP & 0x0FFF
+          //call OP & 0x0FFF jump to a machine code routine
+              printf("SHOULDNT BE HERE!!");
+              while(1);
           break; 
       }
       break;
@@ -209,7 +276,7 @@ void chip8::decode_execute() {
     	uint16_t x = V[(OP & 0x0F00) >> 8];
     	uint16_t y = V[(OP & 0x00F0) >> 4];
     	uint16_t height = OP & 0x000F;
-            uint16_t pixel;
+        uint16_t pixel;
     	 
     	V[15] = 0;
     	for (int yline = 0; yline < height; yline++)
