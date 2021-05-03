@@ -4,12 +4,16 @@
 #include "SDL.h"
 #include "SDL_opengl.h"
 
-#define fileBufferSize 1024
+#define FILE_BUFFER_SIZE 1024
+#define CYCLE_PERIOD (1000/60)
 
-uint8_t fileBuffer[fileBufferSize];
+uint8_t fileBuffer[FILE_BUFFER_SIZE];
 
-SDL_Window *sdlWindow;
-SDL_Renderer *sdlRenderer;
+SDL_Window * sdlWindow;
+SDL_Renderer * sdlRenderer;
+SDL_Texture * sdlTexture;
+
+int last_frame;
 
 void drawInitial(){
     SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
@@ -21,23 +25,30 @@ void drawInitial(){
     printf("%s\n", SDL_GetError());
 }
 
-void updateScreen(uint8_t * screen){
-    printf("update screen\n");
+void updateScreen(uint32_t * screen){
+//    printf("update screen\n");
     SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
-    //SDL_RenderClear(sdlRenderer);
-    //SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
-    for(int j=0; j<32; j++){
-        for(int i=0; i<64; i++){
-            if(screen[j*64 + i] == 1){
-                SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
-                SDL_RenderDrawPoint(sdlRenderer, i, j);
-            }
-            else{
-                SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
-                SDL_RenderDrawPoint(sdlRenderer, i, j);
-            }
-        }
-    }
+//    SDL_Rect rect;
+//    rect.x = rect.y = 0;
+//    rect.w = 64;
+//    rect.y = 32;
+//    SDL_RenderFillRect(sdlRenderer, &rect);
+    SDL_RenderClear(sdlRenderer);
+    SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
+    SDL_UpdateTexture(sdlTexture, NULL, screen, 64 * sizeof(uint32_t));
+    SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
+//    for(int j=0; j<32; j++){
+//        for(int i=0; i<64; i++){
+//            if(screen[j*64 + i] == 1){
+//                SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
+//                SDL_RenderDrawPoint(sdlRenderer, i, j);
+//            }
+//            else{
+//                SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
+//                SDL_RenderDrawPoint(sdlRenderer, i, j);
+//            }
+//        }
+//    }
     //resetscreen bits?
 //    printf("%s\n", SDL_GetError());
     //SDL_RenderClear(sdlRenderer);
@@ -58,6 +69,10 @@ int main() {
 //                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);//SDL_WINDOW_OPENGL); not used with renderer? //
 //    SDL_Renderer *sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
     SDL_CreateWindowAndRenderer(640, 320, SDL_WINDOW_RESIZABLE, &sdlWindow, &sdlRenderer);
+    sdlTexture = SDL_CreateTexture(sdlRenderer,
+                                   SDL_PIXELFORMAT_ARGB8888,
+                                   SDL_TEXTUREACCESS_STATIC,
+                                   64, 32);
     printf("%s\n", SDL_GetError());
     //SDL_RenderSetScale(sdlRenderer, 640, 320);
     SDL_RenderSetLogicalSize(sdlRenderer, 64, 32);
@@ -76,7 +91,7 @@ int main() {
     FILE * programF = fopen("/Users/gorkemcaylak/Documents/Chip8/Chip8/invaders.c8", "rb");
     int bytesRead;
     if(programF != NULL){
-        bytesRead = fread(fileBuffer, sizeof(fileBuffer[0]), fileBufferSize, programF);
+        bytesRead = (int)fread(fileBuffer, sizeof(fileBuffer[0]), FILE_BUFFER_SIZE, programF);
     }
     else{
         printf("couldnt open file!!");
@@ -95,25 +110,33 @@ int main() {
     SDL_Event e;
     bool quit = false;
     while (!quit){
-        while (SDL_PollEvent(&e)){
+        last_frame = SDL_GetTicks();
+        if (SDL_PollEvent(&e)){
             if (e.type == SDL_KEYDOWN){
                 /* Print the hardware scancode first */
-                printf( "Scancode: 0x%02X", e.key.keysym.scancode );
+//                printf( "Scancode: 0x%02X", e.key.keysym.scancode );
                 /* Print the name of the key */
-                printf( ", Name: %s\n", SDL_GetKeyName( e.key.keysym.sym ) );
+//                printf( ", Name: %s\n", SDL_GetKeyName( e.key.keysym.sym ) );
                 chip8_emu.handleKeyPress(e.key.keysym.scancode);
             }
             else if (e.type == SDL_QUIT){
                 quit = true;
             }
-            chip8_emu.emulateCycle();
-            if(chip8_emu.readyToDraw()){
-                updateScreen(chip8_emu.getScreen());
-                chip8_emu.resetDrawFlag();
-            }
+            
             
         }
+        chip8_emu.emulateCycle();
+        if(chip8_emu.readyToDraw()){
+            updateScreen(chip8_emu.getScreen());
+            chip8_emu.resetDrawFlag();
+        }
+        int currentFrame = SDL_GetTicks() - last_frame;
+        if(currentFrame < CYCLE_PERIOD) {
+            SDL_Delay(CYCLE_PERIOD - currentFrame);
+        }
     }
+    SDL_DestroyRenderer(sdlRenderer);
+    SDL_DestroyWindow(sdlWindow);
     SDL_Quit();
     return 0;
 

@@ -16,6 +16,12 @@
 #define STACK_SIZE 16
 #define FONTSET_ADDRESS 0x0050
 
+#define SCREEN_W 64
+#define SCREEN_H 32
+
+#define OFF 0xFF000000
+#define ON 0xFFFFFF00
+
 class chip8{
 
   public:
@@ -27,7 +33,7 @@ class chip8{
     void handleKeyPress(int key);
     bool readyToDraw() { return drawFlag; }
     void resetDrawFlag() { drawFlag = false; }
-    uint8_t * getScreen() { return screen; }
+    uint32_t * getScreen() { return screen; }
 
   private:
     uint16_t OP;
@@ -36,7 +42,7 @@ class chip8{
     uint16_t I; // index register
     uint16_t PC; // program counter
     
-    uint8_t screen[64 * 32];
+    uint32_t screen[64 * 32];
     uint8_t delay_timer;
     uint8_t sound_timer;
     

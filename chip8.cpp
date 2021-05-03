@@ -91,8 +91,8 @@ void chip8::initialize() {
     SP = 0;
 
     //will clear display, stack, registers, memory
-    for(int i=0; i<64*32;i++) {
-        screen[i] = 0;
+    for(int i=0; i<SCREEN_W*SCREEN_H;i++) {
+        screen[i] = OFF;
     }
 //    for(int j=0; j<32; j++){
 //        for(int i=0; i<64; i++){
@@ -128,22 +128,21 @@ void chip8::initialize() {
 void chip8::fetch() {
   
     OP = (memory[PC] << 8) | memory[PC+1];
-    printf("OP : 0x%.4X\n", OP);
+//    printf("OP : 0x%.4X\n", OP);
 }
 
 void chip8::decode_execute() {
 
   uint32_t a = V[(OP & 0x0F00)>>8];
   uint32_t b = V[(OP & 0x00F0)>>4];
-//    printf("first byte masked: 0x%.4x\n", OP & 0xF000);
   switch(OP & 0xF000) { // leftmost 4 bits used for OP interpretation
           
       case 0x0000:
       switch(OP) {
         case 0x00E0:
           //display clear
-          for(int i=0; i<64*32; i++) 
-            screen[i] = 0;
+          for(int i=0; i<SCREEN_W*SCREEN_H; i++)
+            screen[i] = OFF;
           drawFlag = true;
           // int r = 0, g = 128, b = 0; //green
           // SDL_FillRect(screen_surface, NULL, SDL_MapRGB(SDL_GetVideoSurface()->format, r,g,b));
@@ -299,14 +298,19 @@ void chip8::decode_execute() {
     	V[15] = 0;
     	for (int yline = 0; yline < height; yline++)
     	{
-    	  pixel = memory[I + yline];
+    	  
     	  for(int xline = 0; xline < 8; xline++)
     	  {
-    	    if((pixel & (0x80 >> xline)) != 0)
+            pixel = memory[I + yline];
+    	    if((pixel & (0x80 >> xline)))
     	    {
-                  if(screen[(x + xline + ((y + yline) * 64)) %(64*32)] == 1)
-    	        V[15] = 1;     // collision                            
-                  screen[x + xline + ((y + yline) * 64) % (64*32)] ^= 1;
+                int index = (x + xline) % SCREEN_W + (((y + yline) % SCREEN_H) * SCREEN_W);
+                if(screen[index] == ON) {
+                    V[15] = 1;     // collision
+                    screen[index] = OFF;
+                }
+                else
+                  screen[index] = ON;
     	    }
     	  }
             }
@@ -315,7 +319,6 @@ void chip8::decode_execute() {
       }
     	break;
     case 0xE000:
-          printf("0xE0 %.2X\n", OP & 0x00FF);
       switch(OP & 0x00FF){
         case 0x009E:  
           if(keypad[V[(OP & 0x0F00) >> 8]] == 0) {
@@ -340,10 +343,12 @@ void chip8::decode_execute() {
         case 0x000A:
         {
           bool keyPress = false;
+          printf("checking key\n");
           for(int i = 0; i < 16; ++i) {
               if(keypad[i] != 0) {
                   V[(OP & 0x0F00) >> 8] = i;
                   keyPress = true;
+                  printf("key press! \n");
               }
           }
           if(!keyPress) {
@@ -411,5 +416,18 @@ void chip8::update_timers() {
 void chip8::emulateCycle() {
   fetch();
   decode_execute();
-  update_timers(); 
+  update_timers();
+//    // Draw
+//        for(int y = 0; y < 32; ++y)
+//        {
+//            for(int x = 0; x < 64; ++x)
+//            {
+//                if(screen[(y*64) + x] == OFF)
+//                    printf("O");
+//                else
+//                    printf(" ");
+//            }
+//            printf("\n");
+//        }
+//        printf("\n");
 }
