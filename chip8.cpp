@@ -100,19 +100,35 @@ void chip8::initialize() {
 //        }
 //    }
             
-    for(int i=0; i<80; i++) {
+    for(int i = 0; i < MEMORY_SIZE; i++)
+        memory[i] = 0;
+    
+    for(int i = 0; i < 80; i++)
         memory[i] = chip8_fontset[i];
-    }
+    
+    for(int i = 0; i < STACK_SIZE; i++)
+        stack[i] = 0;
+    
+    for(int i = 0; i < REG_COUNT; i++)
+        V[i] = 0;
+    
+    for(int i = 0; i < 16; i++)
+        keypad[i] = 0;
+    
+    delay_timer = 0;
+    sound_timer = 0;
+    
     drawFlag = true;
     printf("chip 8 emulator initialized\n");
     //reset timers
+    srand ((int)time(NULL));
 }
 
 
 void chip8::fetch() {
   
     OP = (memory[PC] << 8) | memory[PC+1];
-    printf("OP : 0x%X\n", OP);
+    printf("OP : 0x%.4X\n", OP);
 }
 
 void chip8::decode_execute() {
@@ -318,8 +334,21 @@ void chip8::decode_execute() {
           V[(OP & 0x0F00) >> 8] = delay_timer;
           break;
         case 0x000A:
-          V[(OP & 0x0F00) >> 8] = sound_timer;
+        {
+          bool keyPress = false;
+          for(int i = 0; i < 16; ++i) {
+              if(keypad[i] != 0) {
+                  V[(OP & 0x0F00) >> 8] = i;
+                  keyPress = true;
+              }
+          }
+          if(!keyPress) {
+              //no key press, rerun
+              PC -= 2;
+              return;
+          }
           break;
+        }
         case 0x0015:
           delay_timer = V[(OP & 0x0F00) >> 8];
           break; 
@@ -327,9 +356,14 @@ void chip8::decode_execute() {
           sound_timer = V[(OP & 0x0F00) >> 8];
           break;   
         case 0x001E:
-          I += V[(OP & 0x0F00) >> 8];
-          break; 
+              if(I + V[(OP & 0x0F00) >> 8] > 0xFFF)
+                  V[15] = 1;
+              else
+                  V[15] = 0;
+              I += V[(OP & 0x0F00) >> 8];
+              break;
         case 0x0029:
+              I = V[(OP & 0x0F00) >> 8] * 0x0005;
           //	I=sprite_addr[Vx]??
           break;            
         case 0x0033:
@@ -338,14 +372,16 @@ void chip8::decode_execute() {
           memory[I + 2] = (V[(OP & 0x0F00) >> 8] % 100) % 10;
           break;
         case 0x0055:
-          for(uint16_t i=0; i<16; i++){
-            memory[I+i] = V[i];
+          for(uint16_t i = 0; i < ((OP & 0x0F00) >> 8); i++){
+            memory[I + i] = V[i];
           }
+              I += ((OP & 0x0F00) >> 8) + 1;
           break;
         case 0x0065:
-          for(uint16_t i=0; i<16; i++){
-            V[i] = memory[I+i];
+          for(uint16_t i = 0; i < ((OP & 0x0F00) >> 8); i++){
+            V[i] = memory[I + i];
           }
+              I += ((OP & 0x0F00) >> 8) + 1;
           break;
         default:
           printf("Unknown F operation with 0x%X!\n", OP);
