@@ -14,6 +14,7 @@
 #define MEMORY_SIZE 4096
 #define REG_COUNT 16
 #define STACK_SIZE 16
+#define FONTSET_ADDRESS 0x0050
 
 class chip8{
 

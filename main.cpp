@@ -24,11 +24,11 @@ void drawInitial(){
 void updateScreen(uint8_t * screen){
     printf("update screen\n");
     SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
-    SDL_RenderClear(sdlRenderer);
+    //SDL_RenderClear(sdlRenderer);
     //SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
     for(int j=0; j<32; j++){
         for(int i=0; i<64; i++){
-            if(screen[j*64+i] == 1){
+            if(screen[j*64 + i] == 1){
                 SDL_SetRenderDrawColor(sdlRenderer, 0, 200, 0, 255);
                 SDL_RenderDrawPoint(sdlRenderer, i, j);
             }

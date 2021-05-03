@@ -103,7 +103,7 @@ void chip8::initialize() {
     for(int i = 0; i < MEMORY_SIZE; i++)
         memory[i] = 0;
     
-    for(int i = 0; i < 80; i++)
+    for(int i = 0; i < FONTSET_ADDRESS; i++)
         memory[i] = chip8_fontset[i];
     
     for(int i = 0; i < STACK_SIZE; i++)
@@ -135,8 +135,10 @@ void chip8::decode_execute() {
 
   uint32_t a = V[(OP & 0x0F00)>>8];
   uint32_t b = V[(OP & 0x00F0)>>4];
+//    printf("first byte masked: 0x%.4x\n", OP & 0xF000);
   switch(OP & 0xF000) { // leftmost 4 bits used for OP interpretation
-    case 0x0000:
+          
+      case 0x0000:
       switch(OP) {
         case 0x00E0:
           //display clear
@@ -302,9 +304,9 @@ void chip8::decode_execute() {
     	  {
     	    if((pixel & (0x80 >> xline)) != 0)
     	    {
-                  if(screen[(x + xline + ((y + yline) * 64))] == 1)
+                  if(screen[(x + xline + ((y + yline) * 64)) %(64*32)] == 1)
     	        V[15] = 1;     // collision                            
-                  screen[x + xline + ((y + yline) * 64)] ^= 1;
+                  screen[x + xline + ((y + yline) * 64) % (64*32)] ^= 1;
     	    }
     	  }
             }
@@ -313,6 +315,7 @@ void chip8::decode_execute() {
       }
     	break;
     case 0xE000:
+          printf("0xE0 %.2X\n", OP & 0x00FF);
       switch(OP & 0x00FF){
         case 0x009E:  
           if(keypad[V[(OP & 0x0F00) >> 8]] == 0) {
@@ -327,7 +330,8 @@ void chip8::decode_execute() {
         default:
           printf("Unknown key operation with 0x%X!\n", OP);
           break;
-      } 
+      }
+          break;
     case 0xF000:
       switch(OP & 0x00FF){
         case 0x0007:
@@ -387,7 +391,7 @@ void chip8::decode_execute() {
           printf("Unknown F operation with 0x%X!\n", OP);
           break;
         }
-//      break;
+      break;
     default:
       printf("unknown OP read: 0x%X !\n ", OP);
       break;
