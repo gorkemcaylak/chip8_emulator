@@ -28,7 +28,7 @@ class chip8{
     chip8();
     ~chip8();
     void initialize();
-    void loadProgram(uint8_t * buffer, int size);
+    void loadProgram(const char * rom_name);
     void emulateCycle();
     void handleKeyPress(int key, bool down);
     bool readyToDraw() { return drawFlag; }

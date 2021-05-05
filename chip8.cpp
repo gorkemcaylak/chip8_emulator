@@ -1,7 +1,12 @@
 #include "chip8.h"
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
 #include <unordered_map>
+#include "SDL.h"
+
+
+#define FILE_BUFFER_SIZE 2048
+
 
 uint8_t chip8_fontset[80] =
 {
@@ -41,40 +46,86 @@ uint8_t chip8_fontset[80] =
  Scancode: 0x19, Name: V
  
  */
-std::unordered_map<int, int> keyMap = {
-    {0x1E, 0}, //1
-    {0x1F, 1}, //2
-    {0x20, 2}, //3
-    {0x21, 3}, //4
-    {0x14, 4}, //q
-    {0x1A, 5}, //w
-    {0x08, 6}, //e
-    {0x15, 7}, //r
-    {0x04, 8}, //a
-    {0x16, 9}, //s
-    {0x07,10}, //d
-    {0x09,11}, //f
-    {0x1D,12}, //z
-    {0x1B,13}, //x
-    {0x06,14}, //c
-    {0x19,15}  //v
-};
 
 void chip8::handleKeyPress(int key, bool down) {
-    if(keyMap.count(key) > 0){
-        keypad[keyMap[key]] = (down) ? 1 : 0;
-        //down ? printf("key down: 0x%X\n", key) : printf("key up: 0x%X\n", key);
-
-    }
-    else {
-        printf("undefined key operation!\n");
+    switch(key){
+        case SDL_SCANCODE_1:
+            keypad[0x1] = down;
+            break;
+        case SDL_SCANCODE_2:
+            keypad[0x2] = down;
+            break;
+        case SDL_SCANCODE_3:
+            keypad[0x3] = down;
+            break;
+        case SDL_SCANCODE_4:
+            keypad[0xC] = down;
+            break;
+        case SDL_SCANCODE_Q:
+            keypad[0x4] = down;
+            break;
+        case SDL_SCANCODE_W:
+            keypad[0x5] = down;
+            break;
+        case SDL_SCANCODE_E:
+            keypad[0x6] = down;
+            break;
+        case SDL_SCANCODE_R:
+            keypad[0xD] = down;
+            break;
+        case SDL_SCANCODE_A:
+            keypad[0x7] = down;
+            break;
+        case SDL_SCANCODE_S:
+            keypad[0x8] = down;
+            break;
+        case SDL_SCANCODE_D:
+            keypad[0x9] = down;
+            break;
+        case SDL_SCANCODE_F:
+            keypad[0xE] = down;
+            break;
+        case SDL_SCANCODE_Z:
+            keypad[0xA] = down;
+            break;
+        case SDL_SCANCODE_X:
+            keypad[0x0] = down;
+            break;
+        case SDL_SCANCODE_C:
+            keypad[0xB] = down;
+            break;
+        case SDL_SCANCODE_V:
+            keypad[0xF] = down;
+            break;
+        case SDL_SCANCODE_ESCAPE:
+            printf("Quitting...\n");
+            exit(1);
+            break;
+        default:
+            printf("undefined key operation!\n");
+            break;
     }
 }
 
-void chip8::loadProgram(uint8_t * buffer, int size) {
-    for(int i=0; i<size; i++) {
-        memory[0x200+i] = buffer[i];
+void chip8::loadProgram(const char * rom_name) {
+    FILE * programF = fopen(rom_name, "rb");
+    int bytesRead;
+    if(programF != NULL){
+        bytesRead = (int)fread(&memory[0x200], sizeof(uint8_t), FILE_BUFFER_SIZE, programF);
+        if(bytesRead == -1) {
+            printf("couldnt read!!");
+            exit(1);
+        }
     }
+    else{
+        printf("couldnt open file!!");
+        exit(1);
+    }
+    
+    printf("bytes read: %d\n", bytesRead);
+    for(int i =0; i<10; i++)
+        printf("0x%X ", memory[0x200 + i]);
+    printf("\n");
 }
 
 chip8::chip8() {}
@@ -92,24 +143,24 @@ void chip8::initialize() {
         screen[i] = OFF;
     }
     
-//    for(int i = 0; i < MEMORY_SIZE; i++)
-//        memory[i] = 0;
-    memset(memory, 0, sizeof(memory));
+    for(int i = 0; i < MEMORY_SIZE; i++)
+        memory[i] = 0;
+//    memset(memory, 0, sizeof(memory));
     
     for(int i = 0; i < FONTSET_ADDRESS; i++)
         memory[i] = chip8_fontset[i];
-//
+
+    
     for(int i = 0; i < STACK_SIZE; i++)
         stack[i] = 0;
-//    memset(stack, 0, sizeof(stack));
 
-//    for(int i = 0; i < REG_COUNT; i++)
-//        V[i] = 0;
-    memset(V, 0, sizeof(V));
+    for(int i = 0; i < REG_COUNT; i++)
+        V[i] = 0;
+//    memset(V, 0, sizeof(V));
 
-//    for(int i = 0; i < 16; i++)
-//        keypad[i] = 0;
-    memset(keypad, 0, sizeof(keypad));
+    for(int i = 0; i < 16; i++)
+        keypad[i] = 0;
+//    memset(keypad, 0, sizeof(keypad));
 
     delay_timer = 0;
     sound_timer = 0;
@@ -129,10 +180,11 @@ void chip8::fetch() {
 
 void chip8::decode_execute() {
 
-  uint32_t a = V[(OP & 0x0F00)>>8];
-  uint32_t b = V[(OP & 0x00F0)>>4];
+  uint32_t Vx = V[(OP & 0x0F00)>>8];
+  uint32_t Vy = V[(OP & 0x00F0)>>4];
 
     PC += 2;
+    
   switch(OP & 0xF000) { // leftmost 4 bits used for OP interpretation
           
       case 0x0000:
@@ -141,15 +193,20 @@ void chip8::decode_execute() {
           //display clear
           for(int i=0; i<SCREEN_W*SCREEN_H; i++)
             screen[i] = OFF;
-          drawFlag = true;
+//          drawFlag = true;
           // int r = 0, g = 128, b = 0; //green
           // SDL_FillRect(screen_surface, NULL, SDL_MapRGB(SDL_GetVideoSurface()->format, r,g,b));
           break;
         case 0x00EE:
-          SP--;
-          PC = stack[SP];
-          //return
-          break;
+              SP--;
+              if(SP < 0){
+                  printf("stack underflow!\n");
+                  exit(1);
+              }
+          
+              PC = stack[SP];
+              //return
+              break;
         default:
           //call OP & 0x0FFF jump to a machine code routine
               printf("SHOULDNT BE HERE!!");
@@ -168,6 +225,11 @@ void chip8::decode_execute() {
       //calls subroutine OP & 0x0FFF
       stack[SP] = PC;
       SP++;
+          if(SP > 15){
+              printf("stack overflow!\n");
+              exit(1);
+          }
+      
       PC = OP & 0x0FFF;
 //      PC -= 2;
       break;
@@ -218,43 +280,43 @@ void chip8::decode_execute() {
 
         case 0x0004:
 //          V[(OP & 0x0F00)>>8] += V[(OP & 0x00F0)>>4];
-          a += b;
-          if(a > 0x0000FFFF){
+          Vx += Vy;
+          if(Vx > 0x0000FFFF){
 //            a -= 0x00010000; //not necessary?
             V[15] = 1;
           } 
           else{
             V[15] = 0;
           } 
-          V[(OP & 0x0F00)>>8] = (uint8_t)(a & 0x0000FFFF);
+          V[(OP & 0x0F00)>>8] = (uint8_t)(Vx & 0x0000FFFF);
           break;
 
         case 0x0005:
-          if(a <= b){
+          if(Vx < Vy){ //equals?
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-          V[(OP & 0x0F00)>>8] = (uint8_t)((a - b) & 0x0000FFFF);
+          V[(OP & 0x0F00)>>8] = (uint8_t)((Vx - Vy) & 0x0000FFFF);
           break;
 
         case 0x0006:
-          V[15] = a & 0x0001;
+          V[15] = Vx & 0x0001;
           V[(OP & 0x0F00)>>8] >>= 1;
           break;
 
         case 0x0007:
-          if(b <= a){
+          if(Vy < Vx){
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-              V[(OP & 0x0F00)>>8] = (uint8_t)((b - a) & 0x0000FFFF);
+              V[(OP & 0x0F00)>>8] = (uint8_t)((Vy - Vx) & 0x0000FFFF);
           break;
         case 0x000E:
-          V[15] = a & 0x0080; // was a & 0x8000;!
+          V[15] = Vx >> 7;
           V[(OP & 0x0F00)>>8] <<= 1;
           break;
         default:
@@ -263,7 +325,7 @@ void chip8::decode_execute() {
         } 
     case 0x9000:
       //compare 2 regs not equal
-      if(a != b)
+      if(Vx != Vy)
         PC += 2;
       break;
     case 0xA000:
@@ -271,84 +333,83 @@ void chip8::decode_execute() {
       break;
     case 0xB000:
       PC = V[0] + (OP & 0x0FFF); 
-//      PC -= 2;
       break;
     case 0xC000:
           V[(OP & 0x0F00) >> 8] = (rand() % 0x00FF) & (OP & 0x00FF);
       break;
     case 0xD000:
-      {
-    //Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N+1 pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value does not change after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn, and to 0 if that does not happen
+        {
+            //Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N+1 pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value does not change after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn, and to 0 if that does not happen
             //starting from memory[I]
-    	uint16_t x = V[(OP & 0x0F00) >> 8];
-    	uint16_t y = V[(OP & 0x00F0) >> 4];
-    	uint16_t height = OP & 0x000F;
-        uint16_t pixel;
-    	 
-    	V[15] = 0;
-    	for (int yline = 0; yline < height; yline++)
-    	{
-    	  
-    	  for(int xline = 0; xline < 8; xline++)
-    	  {
-            pixel = memory[I + yline];
-    	    if((pixel & (0x80 >> xline)))
-    	    {
-                int index = (x + xline) % SCREEN_W + (((y + yline) % SCREEN_H) * SCREEN_W);
-                if(screen[index] == ON) {
-                    V[15] = 1;     // erase
-                    screen[index] = OFF;
+            uint16_t Vx = V[(OP & 0x0F00) >> 8];
+            uint16_t Vy = V[(OP & 0x00F0) >> 4];
+            uint16_t height = OP & 0x000F;
+            uint16_t pixel;
+
+            V[15] = 0;
+            for (int yline = 0; yline < height; yline++) {
+                uint8_t row = yline + Vy;
+
+                for(int xline = 0; xline < 8; xline++) {
+                    pixel = memory[I + yline];
+                    uint8_t col = xline + Vx;
+                    if((pixel & (0x80 >> xline)) != 0)
+                    {
+                        int index = col % SCREEN_W + ((row % SCREEN_H) * SCREEN_W);
+                        if(screen[index] == ON) {
+                            V[15] = 1;     // erase
+                            screen[index] = OFF;
+                        }
+                        else {
+                            screen[index] = ON;
+                        }
+                    }
                 }
-                else
-                  screen[index] = ON;
-    	    }
-    	  }
             }
-    	 
-          drawFlag = true;
-      }
-    	break;
+             
+            drawFlag = true;
+        }
+        break;
+          
     case 0xE000:
-      switch(OP & 0x00FF){
-        case 0x009E:  
-          if(keypad[V[(OP & 0x0F00) >> 8]] == 1) {
-            PC += 2;
-          }
-          break;
-        case 0x00A1:
-          if(keypad[V[(OP & 0x0F00) >> 8]] != 1) {
-            PC += 2;
-          }
-          break;
-        default:
-          printf("Unknown key operation with 0x%X!\n", OP);
-          break;
-      }
-          break;
+        switch(OP & 0x00FF){
+            case 0x009E:
+                if(keypad[V[(OP & 0x0F00) >> 8]] != 0)
+                    PC += 2;
+                break;
+            case 0x00A1:
+                if(keypad[V[(OP & 0x0F00) >> 8]] == 0)
+                    PC += 2;
+                break;
+            default:
+                printf("Unknown key operation with 0x%X!\n", OP);
+                break;
+        }
+        break;
+          
     case 0xF000:
-      switch(OP & 0x00FF){
-        case 0x0007:
-          V[(OP & 0x0F00) >> 8] = delay_timer;
-          break;
+        switch(OP & 0x00FF){
+            case 0x0007:
+            V[(OP & 0x0F00) >> 8] = delay_timer;
+            break;
         case 0x000A:
         {
-          bool keyPress = false;
-          printf("checking key\n");
-          for(int i = 0; i < 16; ++i) {
-              if(keypad[i] != 0) {
-                  V[(OP & 0x0F00) >> 8] = i;
-                  keyPress = true;
-                  printf("key press! \n");
-                  break; // ADDED!
-              }
-          }
-          if(!keyPress) {
-              //no key press, rerun
-              PC -= 2;
-//              return; //DISABLED!
-          }
-          break;
+            bool keyPress = false;
+            printf("checking key\n");
+            for(int i = 0; i < 16; ++i) {
+                if(keypad[i] != 0) {
+                    V[(OP & 0x0F00) >> 8] = i;
+                    keyPress = true;
+                    printf("key press! \n");
+                }
+            }
+            if(!keyPress) {
+                //no key press, rerun
+                PC -= 2;
+                return;
+            }
         }
+            break;
         case 0x0015:
           delay_timer = V[(OP & 0x0F00) >> 8];
           break; 
@@ -356,21 +417,16 @@ void chip8::decode_execute() {
           sound_timer = V[(OP & 0x0F00) >> 8];
           break;   
         case 0x001E:
-              //DISABLED!
-              if(I + V[(OP & 0x0F00) >> 8] > 0xFFF)
-                  V[15] = 1;
-              else
-                  V[15] = 0;
-              I += V[(OP & 0x0F00) >> 8];
-              break;
+            // VF not affected!
+            I += V[(OP & 0x0F00) >> 8];
+            break;
         case 0x0029:
-              I = V[(OP & 0x0F00) >> 8] * 5;
-          //	I=sprite_addr[Vx]??
-          break;            
+            I = V[(OP & 0x0F00) >> 8] * 5;
+            break;
         case 0x0033:
-          memory[I]     = a / 100;
-          memory[I + 1] = (a / 10) % 10;
-          memory[I + 2] = a % 10;
+          memory[I]     = Vx / 100;
+          memory[I + 1] = (Vx / 10) % 10;
+          memory[I + 2] = Vx % 10;
           break;
         case 0x0055:
 //          for(uint16_t i = 0; i <= ((OP & 0x0F00) >> 8); i++){
