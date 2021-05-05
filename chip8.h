@@ -30,7 +30,7 @@ class chip8{
     void initialize();
     void loadProgram(uint8_t * buffer, int size);
     void emulateCycle();
-    void handleKeyPress(int key);
+    void handleKeyPress(int key, bool down);
     bool readyToDraw() { return drawFlag; }
     void resetDrawFlag() { drawFlag = false; }
     uint32_t * getScreen() { return screen; }

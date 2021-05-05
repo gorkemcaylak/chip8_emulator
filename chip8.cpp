@@ -60,10 +60,10 @@ std::unordered_map<int, int> keyMap = {
     {0x19,15}  //v
 };
 
-void chip8::handleKeyPress(int key) {
+void chip8::handleKeyPress(int key, bool down) {
     if(keyMap.count(key) > 0){
-        keypad[keyMap[key]] = 1;
-        printf("key: 0x%X\n", key);
+        keypad[keyMap[key]] = (down) ? 1 : 0;
+        //down ? printf("key down: 0x%X\n", key) : printf("key up: 0x%X\n", key);
 
     }
     else {
@@ -77,13 +77,10 @@ void chip8::loadProgram(uint8_t * buffer, int size) {
     }
 }
 
-chip8::chip8() {
-    
-}
+chip8::chip8() {}
 
-chip8::~chip8() {
-    
-}
+chip8::~chip8() {}
+
 void chip8::initialize() {
     PC = 0x200;
     OP = 0;
@@ -94,27 +91,26 @@ void chip8::initialize() {
     for(int i=0; i<SCREEN_W*SCREEN_H;i++) {
         screen[i] = OFF;
     }
-//    for(int j=0; j<32; j++){
-//        for(int i=0; i<64; i++){
-//            if(i<(j*2)) screen[i+j*64] = 1;
-//        }
-//    }
-            
-    for(int i = 0; i < MEMORY_SIZE; i++)
-        memory[i] = 0;
+    
+//    for(int i = 0; i < MEMORY_SIZE; i++)
+//        memory[i] = 0;
+    memset(memory, 0, sizeof(memory));
     
     for(int i = 0; i < FONTSET_ADDRESS; i++)
         memory[i] = chip8_fontset[i];
-    
+//
     for(int i = 0; i < STACK_SIZE; i++)
         stack[i] = 0;
-    
-    for(int i = 0; i < REG_COUNT; i++)
-        V[i] = 0;
-    
-    for(int i = 0; i < 16; i++)
-        keypad[i] = 0;
-    
+//    memset(stack, 0, sizeof(stack));
+
+//    for(int i = 0; i < REG_COUNT; i++)
+//        V[i] = 0;
+    memset(V, 0, sizeof(V));
+
+//    for(int i = 0; i < 16; i++)
+//        keypad[i] = 0;
+    memset(keypad, 0, sizeof(keypad));
+
     delay_timer = 0;
     sound_timer = 0;
     
@@ -135,6 +131,8 @@ void chip8::decode_execute() {
 
   uint32_t a = V[(OP & 0x0F00)>>8];
   uint32_t b = V[(OP & 0x00F0)>>4];
+
+    PC += 2;
   switch(OP & 0xF000) { // leftmost 4 bits used for OP interpretation
           
       case 0x0000:
@@ -163,7 +161,7 @@ void chip8::decode_execute() {
     case 0x1000:
       //goto OP & 0x0FFF
       PC = OP & 0x0FFF;
-      PC -= 2;
+//      PC -= 2;
       break;
 
     case 0x2000:
@@ -171,7 +169,7 @@ void chip8::decode_execute() {
       stack[SP] = PC;
       SP++;
       PC = OP & 0x0FFF;
-      PC -= 2; 
+//      PC -= 2;
       break;
 
     case 0x3000:
@@ -219,52 +217,44 @@ void chip8::decode_execute() {
           break;
 
         case 0x0004:
-          V[(OP & 0x0F00)>>8] += V[(OP & 0x00F0)>>4];
+//          V[(OP & 0x0F00)>>8] += V[(OP & 0x00F0)>>4];
           a += b;
           if(a > 0x0000FFFF){
-            a -= 0x00010000; //not necessary?
+//            a -= 0x00010000; //not necessary?
             V[15] = 1;
           } 
           else{
             V[15] = 0;
           } 
-          V[(OP & 0x0F00)>>8] = (uint8_t)a;
+          V[(OP & 0x0F00)>>8] = (uint8_t)(a & 0x0000FFFF);
           break;
 
         case 0x0005:
-//          uint32_t subtrahend = V[(OP & 0x0F00)>>8];
-//          uint32_t minuend = V[(OP & 0x00F0)>>4];
-          if(a < b){
-            a += 0x00010000; //not necessary?
+          if(a <= b){
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-          V[(OP & 0x0F00)>>8] = (uint8_t)(a - b);
+          V[(OP & 0x0F00)>>8] = (uint8_t)((a - b) & 0x0000FFFF);
           break;
 
         case 0x0006:
-//          uint16_t temp = V[(OP & 0x0F00)>>8];
           V[15] = a & 0x0001;
           V[(OP & 0x0F00)>>8] >>= 1;
           break;
 
         case 0x0007:
-//          uint32_t minuend = V[(OP & 0x0F00)>>8];
-//          uint32_t subtrahend = V[(OP & 0x00F0)>>4];
-          if(b < a){
-            b += 0x00010000; //not necessary?
+          if(b <= a){
             V[15] = 0;
           } 
           else{
             V[15] = 1;
           } 
-          V[(OP & 0x0F00)>>8] = b - a;
+              V[(OP & 0x0F00)>>8] = (uint8_t)((b - a) & 0x0000FFFF);
           break;
         case 0x000E:
-//          uint16_t temp = V[(OP & 0x0F00)>>8];
-          V[15] = a & 0x8000;
+          V[15] = a & 0x0080; // was a & 0x8000;!
           V[(OP & 0x0F00)>>8] <<= 1;
           break;
         default:
@@ -273,7 +263,7 @@ void chip8::decode_execute() {
         } 
     case 0x9000:
       //compare 2 regs not equal
-      if(V[(OP & 0x0F00) >> 8] != V[(OP & 0x00F0) >> 4])
+      if(a != b)
         PC += 2;
       break;
     case 0xA000:
@@ -281,7 +271,7 @@ void chip8::decode_execute() {
       break;
     case 0xB000:
       PC = V[0] + (OP & 0x0FFF); 
-      PC -= 2; 
+//      PC -= 2;
       break;
     case 0xC000:
           V[(OP & 0x0F00) >> 8] = (rand() % 0x00FF) & (OP & 0x00FF);
@@ -306,7 +296,7 @@ void chip8::decode_execute() {
     	    {
                 int index = (x + xline) % SCREEN_W + (((y + yline) % SCREEN_H) * SCREEN_W);
                 if(screen[index] == ON) {
-                    V[15] = 1;     // collision
+                    V[15] = 1;     // erase
                     screen[index] = OFF;
                 }
                 else
@@ -315,18 +305,18 @@ void chip8::decode_execute() {
     	  }
             }
     	 
-    	drawFlag = true;
+          drawFlag = true;
       }
     	break;
     case 0xE000:
       switch(OP & 0x00FF){
         case 0x009E:  
-          if(keypad[V[(OP & 0x0F00) >> 8]] == 0) {
+          if(keypad[V[(OP & 0x0F00) >> 8]] == 1) {
             PC += 2;
           }
           break;
         case 0x00A1:
-          if(keypad[V[(OP & 0x0F00) >> 8]] != 0) {
+          if(keypad[V[(OP & 0x0F00) >> 8]] != 1) {
             PC += 2;
           }
           break;
@@ -349,12 +339,13 @@ void chip8::decode_execute() {
                   V[(OP & 0x0F00) >> 8] = i;
                   keyPress = true;
                   printf("key press! \n");
+                  break; // ADDED!
               }
           }
           if(!keyPress) {
               //no key press, rerun
               PC -= 2;
-              return;
+//              return; //DISABLED!
           }
           break;
         }
@@ -365,6 +356,7 @@ void chip8::decode_execute() {
           sound_timer = V[(OP & 0x0F00) >> 8];
           break;   
         case 0x001E:
+              //DISABLED!
               if(I + V[(OP & 0x0F00) >> 8] > 0xFFF)
                   V[15] = 1;
               else
@@ -372,25 +364,27 @@ void chip8::decode_execute() {
               I += V[(OP & 0x0F00) >> 8];
               break;
         case 0x0029:
-              I = V[(OP & 0x0F00) >> 8] * 0x0005;
+              I = V[(OP & 0x0F00) >> 8] * 5;
           //	I=sprite_addr[Vx]??
           break;            
         case 0x0033:
-          memory[I]     = V[(OP & 0x0F00) >> 8] / 100;
-          memory[I + 1] = (V[(OP & 0x0F00) >> 8] / 10) % 10;
-          memory[I + 2] = (V[(OP & 0x0F00) >> 8] % 100) % 10;
+          memory[I]     = a / 100;
+          memory[I + 1] = (a / 10) % 10;
+          memory[I + 2] = a % 10;
           break;
         case 0x0055:
-          for(uint16_t i = 0; i < ((OP & 0x0F00) >> 8); i++){
-            memory[I + i] = V[i];
-          }
-              I += ((OP & 0x0F00) >> 8) + 1;
+//          for(uint16_t i = 0; i <= ((OP & 0x0F00) >> 8); i++){
+//            memory[I + i] = V[i];
+//          }
+              memcpy(memory+I, V, ((OP & 0x0F00) >> 8) + 1);
+//              I += ((OP & 0x0F00) >> 8) + 1;
           break;
         case 0x0065:
-          for(uint16_t i = 0; i < ((OP & 0x0F00) >> 8); i++){
-            V[i] = memory[I + i];
-          }
-              I += ((OP & 0x0F00) >> 8) + 1;
+//          for(uint16_t i = 0; i <= ((OP & 0x0F00) >> 8); i++){
+//            V[i] = memory[I + i];
+//          }
+              memcpy(V, memory+I, ((OP & 0x0F00) >> 8) + 1);
+//              I += ((OP & 0x0F00) >> 8) + 1;
           break;
         default:
           printf("Unknown F operation with 0x%X!\n", OP);
@@ -401,7 +395,7 @@ void chip8::decode_execute() {
       printf("unknown OP read: 0x%X !\n ", OP);
       break;
   } 
-  PC += 2;
+  
 }
 
 void chip8::update_timers() {
